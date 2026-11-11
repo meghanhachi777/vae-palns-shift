@@ -83,7 +83,9 @@ python3 scripts/run_benchmarks.py --instances data/cvrplib/X-n101-k25.vrp \
 
 This repository accompanies the manuscript:
 
-> Marino, C. A. *Does learned guidance in adaptive large neighborhood search survive configuration changes and distribution shift? A controlled study on vehicle routing with road-network-derived instances.* Manuscript submitted to the International Transactions in Operational Research.
+> Marino, C. A. *Evaluating learned guidance in adaptive large neighborhood search
+under configuration changes and distribution shift: a controlled
+study on vehicle routing* Manuscript submitted to the International Transactions in Operational Research.
 
 Machine-readable metadata are in `CITATION.cff`. Road data © OpenStreetMap contributors (ODbL).
 
