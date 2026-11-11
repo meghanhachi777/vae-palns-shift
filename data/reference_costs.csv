@@ -1,0 +1,15 @@
+instance,ref_cost,ref_source,bks_literature
+25-cust,187.449,HGS-CVRP 15s (unrounded Euclidean),
+C201,196.23,HGS-CVRP 15s (unrounded Euclidean),
+R201,313.344,HGS-CVRP 15s (unrounded Euclidean),
+RC101,294.994,HGS-CVRP 15s (unrounded Euclidean),
+C1_6_1,2150.04,HGS-CVRP 15s (unrounded Euclidean),
+100-cust,819.558,HGS-CVRP 15s (unrounded Euclidean),
+X-n101-k25,27591.0,HGS-CVRP 20s,27591.0
+X-n110-k13,14971.0,HGS-CVRP 20s,14971.0
+X-n120-k6,13332.0,HGS-CVRP 20s,13332.0
+X-n129-k18,28940.0,HGS-CVRP 20s,28940.0
+X-n148-k46,43448.0,HGS-CVRP 20s,43448.0
+X-n157-k13,16876.0,HGS-CVRP 20s,16876.0
+X-n176-k26,47933.0,HGS-CVRP 20s,47812.0
+X-n200-k36,58608.0,HGS-CVRP 20s,58578.0

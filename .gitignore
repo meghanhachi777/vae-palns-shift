@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.DS_Store
+._*
+*.aux
+*.log
+*.blg
+*.out
+*.synctex.gz
+*.bbl
+paper/manuscript.*
+paper/*.cls
+paper/*.clo
+paper/*.bst
+data/roads/lima_callao_distritos.geojson
+data/osm/

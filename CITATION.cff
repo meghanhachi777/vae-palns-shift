@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software or data, please cite it as below."
+title: "vae-palns-shift: VAE-guided parallel ALNS for the CVRP under configuration changes and distribution shift"
+authors:
+  - family-names: Marino
+    given-names: Carlos Antonio
+    affiliation: "Pontificia Universidad Católica del Perú; CENTRUM Católica Graduate Business School"
+    email: "cmarino@pucp.pe"
+    orcid: "https://orcid.org/0000-0002-6393-6346"
+version: 1.0.0
+date-released: 2026-11-02
+license: MIT
+repository-code: "https://github.com/meghanhachi777/vae-palns-shift"
+keywords:
+  - adaptive large neighborhood search
+  - vehicle routing
+  - variational autoencoder
+  - distribution shift
+  - conformal prediction
+  - OpenStreetMap

@@ -1,0 +1,5 @@
+{
+ "t_start_worse": 0.01,
+ "q_max_frac": 0.2,
+ "vae_p": 6.0
+}
