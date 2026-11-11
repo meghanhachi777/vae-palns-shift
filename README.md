@@ -17,7 +17,7 @@ verified by finite differences. Every solution reported is independently re-chec
 | `tests/` | 13 correctness tests (feasibility of every operator pair, known optimal cost, VAE gradient check, conformal guarantee, explicit road matrices, …) |
 | `data/` | benchmark instances, reference costs, OSM road extracts and the 42 road instances (see `data/LICENSES.md`) |
 | `models/` | the trained VAEs (`vae_uniform.npz`, `vae_mixed.npz`) and calibrated gates |
-| `results/` | raw CSV logs of all 2,512 runs reported in the paper, plus summaries |
+| `results/` | raw CSV logs of all 3,088 runs reported in the paper, plus summaries |
 | `paper/` | `make_assets.py` regenerates every number, table and figure of the paper from `results/`; `verify_numbers.py` re-computes them independently |
 
 ## Install
@@ -83,7 +83,7 @@ python3 scripts/run_benchmarks.py --instances data/cvrplib/X-n101-k25.vrp \
 
 This repository accompanies the manuscript:
 
-> Marino, C. A. *Does learned guidance in adaptive large neighborhood search survive configuration changes and distribution shift? A controlled study on vehicle routing with road-network-derived instances.* Manuscript submitted to the Journal of Heuristics.
+> Marino, C. A. *Does learned guidance in adaptive large neighborhood search survive configuration changes and distribution shift? A controlled study on vehicle routing with road-network-derived instances.* Manuscript submitted to the International Transactions in Operational Research.
 
 Machine-readable metadata are in `CITATION.cff`. Road data © OpenStreetMap contributors (ODbL).
 
