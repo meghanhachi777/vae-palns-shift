@@ -79,16 +79,16 @@ for m in order:
          "Median gap (\\%)": f"{g.gap_pct.median():.2f}", "CPU s": f"{g.cpu_s.mean():.1f}"}
     if m != "PALNS":
         mean, w, t, l, p, _ = paired(X, m, "PALNS")
-        r.update({"$\\Delta$ vs PALNS (\\%)": f"{mean:+.2f}", "W/T/L": f"{w}/{t}/{l}", "_p": p})
+        r.update({"$\\Delta$ (\\%)": f"{mean:+.2f}", "W/T/L": f"{w}/{t}/{l}", "$p$": pfmt(p), "_p": p})
         ps.append(p)
     else:
-        r.update({"$\\Delta$ vs PALNS (\\%)": "--", "W/T/L": "--", "_p": np.nan})
+        r.update({"$\\Delta$ (\\%)": "--", "W/T/L": "--", "$p$": "--", "_p": np.nan})
     rows.append(r)
 adj = iter(holm(ps))
 for r in rows:
     r["Holm $p$"] = "--" if np.isnan(r["_p"]) else pfmt(next(adj))
 tm = pd.DataFrame(rows).drop(columns="_p")
-tex_table(tm, os.path.join(HERE, "tables", "main.tex"), "lrrrrrr")
+tex_table(tm, os.path.join(HERE, "tables", "main.tex"), "lrrrrrrr")
 piv = X.groupby(["instance", "method"]).gap_pct.mean().unstack()[order]
 fr = stats.friedmanchisquare(*[piv[m] for m in order])
 num("XFriedmanChi", fr.statistic)
@@ -100,6 +100,7 @@ num("XindepDiff", m_ind[0], "{:+.2f}")
 num("XindepP", hp[1], "{:.4f}") if hp[1] >= 0.0001 else num("XindepP", "<0.001")
 num("XvaeDiff", m_vae[0], "{:+.2f}")
 num("XvaeP", m_vae[4], "{:.2f}")
+num("XvaeHolm", hp[2], "{:.2f}")
 num("XvaeWins", m_vae[1], "{:d}")
 num("XvaeLosses", m_vae[3], "{:d}")
 
@@ -448,33 +449,342 @@ num("roadRhoDeadP", p, "{:.2f}")
 rho, p = stats.spearmanr(per_inst.values, dj.circuity.values)
 num("roadRhoCirc", rho, "{:+.2f}")
 num("roadRhoCircP", p, "{:.2f}")
-fig, axes = plt.subplots(1, 2, figsize=(11, 3.8))
-x = np.arange(len(zones))
+# Figure 3: two stacked panels at full text width; zone names on a horizontal axis-free y scale so labels never collide
+okabe = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#000000"]
+plt.rcParams.update({"font.size": 9, "axes.titlesize": 9.5, "axes.labelsize": 9, "legend.fontsize": 8.5,
+                     "xtick.labelsize": 8.5, "ytick.labelsize": 9})
+fig, axes = plt.subplots(2, 1, figsize=(6.5, 7.4), gridspec_kw={"height_ratios": [1.15, 1]})
+ax = axes[0]
+y = np.arange(len(zones))[::-1]
+bh = 0.26
+mcol = {"VAE uniform": okabe[0], "VAE mixed": okabe[1], "Race": okabe[2]}
 for k, (m, lab) in enumerate(meths.items()):
     vals, cis = [], []
     for z in zones:
         _, _, _, _, _, d_ = paired(road[road.tag == z], m, "PALNS")
         vals.append(d_.mean())
         cis.append(1.96 * d_.std() / np.sqrt(len(d_)))
-    axes[0].bar(x + (k - 1) * 0.27, vals, 0.27, yerr=cis, capsize=2, label=lab)
-axes[0].axhline(0, color="k", lw=0.8)
-axes[0].set_xticks(x)
-axes[0].set_xticklabels(zones, fontsize=8, rotation=20)
-axes[0].set_ylabel("cost vs unguided PALNS (%)")
-axes[0].legend(fontsize=7, frameon=False)
-for z in zones:
-    idx = dj.zone == z
-    axes[1].scatter(dj.dead_end_share[idx], per_inst[idx], label=z, s=18)
-axes[1].axhline(0, color="k", lw=0.8)
-axes[1].set_xlabel("dead-end share of zone street network")
-axes[1].set_ylabel("uniform-VAE guidance effect (%)")
-axes[1].legend(fontsize=6, frameon=False, ncol=2)
-plt.tight_layout()
+    ax.barh(y + (1 - k) * bh, vals, bh, xerr=cis, capsize=2, color=mcol[lab], label=lab,
+            error_kw={"elinewidth": 0.8, "ecolor": "0.3"})
+ax.axvline(0, color="k", lw=0.8)
+ax.set_yticks(y)
+ax.set_yticklabels(zones)
+ax.set_xlabel("cost change vs unguided PALNS (%)  (negative = guidance helps)")
+ax.set_title("(a) Effect by zone (mean and 95% CI over instance-seed pairs)", loc="left")
+ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.17), ncol=3, frameon=False)
+ax.grid(axis="x", color="0.9", lw=0.6)
+ax.set_axisbelow(True)
+ax = axes[1]
+dz_ = dj.groupby("zone").dead_end_share.mean().reindex(zones).sort_values()
+rng_j = np.random.default_rng(3)
+for k, z in enumerate(dz_.index):
+    v = per_inst[dj.zone == z].values
+    ax.scatter(k + rng_j.uniform(-0.12, 0.12, len(v)), v, s=24, color=okabe[0], alpha=0.85,
+               edgecolor="white", linewidth=0.4, label="instance" if k == 0 else None, zorder=3)
+    ax.hlines(v.mean(), k - 0.28, k + 0.28, color="k", lw=1.6, label="zone mean" if k == 0 else None, zorder=4)
+ax.axhline(0, color="0.4", lw=0.8)
+ax.set_xticks(range(len(dz_)))
+ax.set_xticklabels([f"{z}\n{v:.3f}" for z, v in dz_.items()])
+ax.set_xlabel("zone, ordered by dead-end share of its street network (value below name)")
+ax.set_ylabel("guidance effect, uniform VAE (%)")
+ax.set_title("(b) Per-instance effect of uniform-VAE guidance by zone", loc="left")
+ax.legend(loc="lower left", frameon=False)
+ax.grid(axis="y", color="0.9", lw=0.6)
+ax.set_axisbelow(True)
+plt.tight_layout(h_pad=1.6)
 plt.savefig(os.path.join(HERE, "figures", "road.pdf"))
 plt.close()
+plt.rcParams.update(plt.rcParamsDefault)
+
+# ------------------------------------- strength of the base search (RQ1 robustness)
+# X instances at 4,000 (main benchmark) and 16,000 iterations; larger X instances (303-502 customers)
+# at 4,000 and 16,000 iterations. PALNS vs VAE-PALNS (mixed VAE), configuration C_D.
+pX = X[X.method == "PALNS"].groupby("instance").gap_pct.mean()
+num("gapXminP", pX.min()); num("gapXmaxP", pX.max())
+strength_parts = []
+fS, fL = os.path.join(R, "bench_strength.csv"), os.path.join(R, "bench_strength_large16k.csv")
+if os.path.exists(fS):
+    S = pd.read_csv(fS)
+    if os.path.exists(fL):
+        S = pd.concat([S, pd.read_csv(fL)])
+    assert S.feasible.all()
+    strength_parts = [S]
+    cells_strength = [("Xshort", "Uchoa X, 101--201", "4{,}000", X[X.method.isin(["PALNS", "VAE-PALNS:mixed"])]),
+             ("Xlong", "Uchoa X, 101--201", "16{,}000", S[S.tag == "X_16k"]),
+             ("Lshort", "Uchoa X, 303--502", "4{,}000", S[S.tag == "large_4k"]),
+             ("Llong", "Uchoa X, 303--502", "16{,}000", S[S.tag == "large_16k"])]
+    rows, ps = [], []
+    for key, inst, bud, d in cells_strength:
+        if d.empty:
+            continue
+        gP = d[d.method == "PALNS"].gap_pct.mean()
+        gV = d[d.method == "VAE-PALNS:mixed"].gap_pct.mean()
+        mean, ws, t, l, p, _ = paired(d, "VAE-PALNS:mixed", "PALNS")
+        nI, nS = d.instance.nunique(), d.seed.nunique()
+        num(f"str{key}gapP", gP); num(f"str{key}gapV", gV)
+        num(f"str{key}D", mean, "{:+.2f}"); num(f"str{key}P", p, "{:.2f}")
+        num(f"str{key}W", ws, "{:d}"); num(f"str{key}L", l, "{:d}")
+        ps.append(p)
+        rows.append({"Instances": inst, "Iter.": bud, "Runs": f"{nI}$\\times${nS}",
+                     "PALNS (\\%)": f"{gP:.2f}", "Guided (\\%)": f"{gV:.2f}",
+                     "$\\Delta$ (\\%)": f"{mean:+.2f}", "W/T/L": f"{ws}/{t}/{l}", "$p$": f"{p:.3f}"})
+    for r, a in zip(rows, holm(ps)):
+        r["Holm $p$"] = f"{a:.3f}"
+    num("strHolmMin", min(holm(ps)), "{:.2f}")
+    num("strXshortHolm", holm(ps)[0], "{:.2f}")
+    tex_table(pd.DataFrame(rows), os.path.join(HERE, "tables", "strength.tex"), "llrrrrrrr")
+    if "strLlonggapP" in NUM:
+        pL = S[(S.tag == "large_16k") & (S.method == "PALNS")].groupby("instance").gap_pct.mean()
+        num("gapLminP", pL.min()); num("gapLmaxP", pL.max())
+        num("strRuns", len(S), "{:d}")
 
 # ------------------------------------------------------------------ totals
-tot = len(main) + len(shift_T) \
+
+# ------------------------------------------- unit-of-analysis sensitivity
+def inst_level(df, a, b, n_mc=200000, seed=1):
+    """Compare a vs b with the instance as the unit: mean over seeds of the paired % change per instance;
+    exact (n<=20) or Monte Carlo sign-flip test and Wilcoxon signed-rank test over instance means.
+    Also returns the run-level (instance-seed) Wilcoxon p used elsewhere in the paper."""
+    pv = df.pivot_table(index=["instance", "seed"], columns="method", values="cost")[[a, b]].dropna()
+    d = 100 * (pv[a] / pv[b] - 1)
+    p_pair = 1.0 if (pv[a] != pv[b]).sum() == 0 else float(stats.wilcoxon(pv[a], pv[b]).pvalue)
+    v = d.groupby(level=0).mean().values
+    obs = abs(v.mean())
+    if len(v) <= 20:
+        sg = np.array(list(itertools.product([1, -1], repeat=len(v))))
+    else:
+        sg = np.random.default_rng(seed).choice([1, -1], size=(n_mc, len(v)))
+    p_flip = float(np.mean(np.abs((sg * v).mean(axis=1)) >= obs - 1e-12))
+    p_wil = 1.0 if np.all(v == 0) else float(stats.wilcoxon(v).pvalue)
+    return {"mean": d.mean(), "n": len(v), "pairs": len(d), "p_pair": p_pair, "p_flip": p_flip, "p_wil": p_wil}
+
+
+def mk(series_frame):
+    return series_frame
+
+
+unit_rows, unit_changed, unit_p = [], [], {}
+XG = X.replace({"method": {"VAE-PALNS:mixed": "G"}})
+comps = [("RQ1", "Uchoa X, $C_D$", "ALNS", X, "ALNS", "PALNS"),
+         ("RQ1", "Uchoa X, $C_D$", "PALNS-indep", X, "PALNS-indep", "PALNS"),
+         ("RQ1", "Uchoa X, $C_D$", "Guided", X, "VAE-PALNS:mixed", "PALNS")]
+for (iset, conf), nm in [(("Generated ID", CD), "Generated, $C_D$"), (("Generated ID", CT), "Generated, $C_T$"),
+                         (("Uchoa X", CT), "Uchoa X, $C_T$")]:
+    comps.append(("RQ2", nm, "Guided", cells[(iset, conf)], "G", "PALNS"))
+for cell, (iset, conf) in cellmap.items():
+    G_ = cells[(iset, conf)]
+    G_ = G_[G_.method == "G"][["instance", "seed", "cost"]].assign(method="G")
+    E_ = eq[eq.cell == cell][["instance", "seed", "cost"]].assign(method="E")
+    nm = ("Generated" if iset.startswith("Gen") else "Uchoa X") + (", $C_D$" if conf == CD else ", $C_T$")
+    comps.append(("RQ2 CPU", nm, "Guided (vs PALNS$^{+}$)", pd.concat([G_, E_]), "G", "E"))
+for c in conds[1:]:  # ID under C_D is the same comparison as RQ2 "Generated, C_D"
+    d_ = w[w.tag == c].melt(id_vars=["instance", "seed"], value_vars=["always", "never"],
+                            var_name="method", value_name="cost")
+    comps.append(("RQ3", f"{c}, $C_D$", "Guided", d_, "always", "never"))
+for m, lab in [("VAE-PALNS:uniform", "Guided (uniform)"), ("VAE-PALNS:mixed", "Guided (mixed)"),
+               ("RACE:uniform", "Race")]:
+    comps.append(("RQ4", "Road, $C_D$", lab, road, m, "PALNS"))
+for key, inst_, bud, d_ in cells_strength:
+    if not d_.empty and key != "Xshort":  # Xshort repeats RQ1 "Guided vs PALNS"
+        comps.append(("Strength", f"X {inst_.split(', ')[1]}, {bud}", "Guided", d_, "VAE-PALNS:mixed", "PALNS"))
+for rq, setn, comp, df_, a, b in comps:
+    r_ = inst_level(df_, a, b)
+    unit_p[(rq, setn, comp)] = r_
+    sig_pair, sig_inst = r_["p_pair"] < 0.05, r_["p_flip"] < 0.05
+    if sig_pair != sig_inst:
+        unit_changed.append(f"{rq} {setn} {comp}")
+    unit_rows.append({"RQ": rq, "Instances": setn, "Comparison": comp, "Inst.": f"{r_['n']}",
+                      "Runs": f"{r_['pairs']}", "$\\Delta$ (\\%)": f"{r_['mean']:+.2f}",
+                      "$p_{\\mathrm{runs}}$": pfmt(r_["p_pair"]), "$p_{\\mathrm{flip}}$": pfmt(r_["p_flip"]),
+                      "$p_{\\mathrm{W}}$": pfmt(r_["p_wil"])})
+tex_table(pd.DataFrame(unit_rows), os.path.join(HERE, "tables", "unit.tex"), "lllrrrrrr")
+num("unitComparisons", len(unit_rows), "{:d}")
+for k_, key_ in [("unitIndep", ("RQ1", "Uchoa X, $C_D$", "PALNS-indep")),
+                 ("unitXvae", ("RQ1", "Uchoa X, $C_D$", "Guided")),
+                 ("unitIDD", ("RQ2", "Generated, $C_D$", "Guided")),
+                 ("unitIDT", ("RQ2", "Generated, $C_T$", "Guided")),
+                 ("unitXT", ("RQ2", "Uchoa X, $C_T$", "Guided"))]:
+    num(k_ + "Pruns", unit_p[key_]["p_pair"], "{:.3f}")
+    num(k_ + "Pinst", unit_p[key_]["p_flip"], "{:.3f}")
+    num(k_ + "Pwil", unit_p[key_]["p_wil"], "{:.3f}")
+num("unitChanged", len(unit_changed), "{:d}")
+print("UNIT CHANGED:", unit_changed)
+
+
+# ------------------------------------------- power and minimum detectable effect
+# Variance components of the paired percentage difference d_is = 100 (cost_a / cost_b - 1) for instance i and
+# seed s, from a balanced one-way random-effects model d_is = mu + a_i + e_is: sigma_inst^2 = Var(a_i), the
+# heterogeneity of the effect across instances; sigma_seed^2 = Var(e_is), the run-to-run noise of a paired
+# difference. Minimum detectable effect (two-sided alpha = 0.05, power 0.8, t approximation):
+#   instance as the unit (generalizes to instances):  MDE = (t_{.975,I-1} + t_{.8,I-1}) sqrt(s_i^2/I + s_s^2/(I S))
+#   runs as the unit (fixed instances):               MDE = (t_{.975,IS-1} + t_{.8,IS-1}) sqrt(s_s^2/(I S))
+def var_components(d):
+    g = d.groupby(level=0)
+    S = g.size().median()
+    msw = g.var(ddof=1).mean()
+    msb = S * g.mean().var(ddof=1)
+    return float(np.sqrt(max(0.0, (msb - msw) / S))), float(np.sqrt(msw)), int(g.ngroups), int(S)
+
+
+def mde(si, ss, I, S, unit="inst", alpha=0.05, power=0.8):
+    if unit == "inst":
+        se, df_ = np.sqrt(si ** 2 / I + ss ** 2 / (I * S)), I - 1
+    else:
+        se, df_ = np.sqrt(ss ** 2 / (I * S)), I * S - 1
+    return float((stats.t.ppf(1 - alpha / 2, df_) + stats.t.ppf(power, df_)) * se)
+
+
+def n_needed(si, ss, S, target, unit="inst"):
+    for I in range(3, 5001):
+        if mde(si, ss, I, S, unit) <= target:
+            return I
+    return np.nan
+
+
+pw_rows, comps_pw = [], {}
+for cell, (iset, conf) in cellmap.items():
+    G_ = cells[(iset, conf)]
+    pv = G_.pivot_table(index=["instance", "seed"], columns="method", values="cost")
+    comps_pw[f"Guided, {iset.replace('Generated ID', 'generated')}, " + ("$C_D$" if conf == CD else "$C_T$")] = \
+        100 * (pv["G"] / pv["PALNS"] - 1)
+pv = road.pivot_table(index=["instance", "seed"], columns="method", values="cost")
+comps_pw["Guided (uniform), road, $C_D$"] = 100 * (pv["VAE-PALNS:uniform"] / pv["PALNS"] - 1)
+for cell, (iset, conf) in cellmap.items():
+    comps_pw[f"A/A rerun, {iset.replace('Generated ID', 'generated')}, " + ("$C_D$" if conf == CD else "$C_T$")] = aa[(iset, conf)]
+vc = {}
+for lab, d in comps_pw.items():
+    si, ss, I, S = var_components(d)
+    vc[lab] = (si, ss)
+    pw_rows.append({"Comparison": lab.replace("Uchoa X", "X"), "$I\\times S$": f"{I}$\\times${S}",
+                    "$\\sigma_{\\mathrm{inst}}$": f"{si:.2f}", "$\\sigma_{\\mathrm{seed}}$": f"{ss:.2f}",
+                    "MDE inst.": f"{mde(si, ss, I, S):.2f}", "MDE runs": f"{mde(si, ss, I, S, 'runs'):.2f}",
+                    "$I$ for 0.2": f"{n_needed(si, ss, 5, 0.2)}", "$I$ for 0.1": f"{n_needed(si, ss, 5, 0.1)}"})
+tex_table(pd.DataFrame(pw_rows), os.path.join(HERE, "tables", "power.tex"), "lrrrrrrr")
+guided_keys = [k for k in vc if k.startswith("Guided") and "road" not in k]
+si_med = float(np.median([vc[k][0] for k in guided_keys]))
+ss_med = float(np.median([vc[k][1] for k in guided_keys]))
+num("pwSiMed", si_med); num("pwSsMed", ss_med)
+num("pwSiMin", min(vc[k][0] for k in guided_keys)); num("pwSiMax", max(vc[k][0] for k in guided_keys))
+num("pwSsMin", min(vc[k][1] for k in comps_pw)); num("pwSsMax", max(vc[k][1] for k in comps_pw))
+aa_keys = [k for k in vc if k.startswith("A/A")]
+num("pwAaSiMax", max(vc[k][0] for k in aa_keys))
+mde_inst_paper = [mde(vc[k][0], vc[k][1], 8, 5 if "X" in k else 4) for k in guided_keys]
+mde_runs_paper = [mde(vc[k][0], vc[k][1], 8, 5 if "X" in k else 4, "runs") for k in guided_keys]
+num("pwMdeInstMin", min(mde_inst_paper)); num("pwMdeInstMax", max(mde_inst_paper))
+num("pwMdeRunsMin", min(mde_runs_paper)); num("pwMdeRunsMax", max(mde_runs_paper))
+for S_ in (1, 5, 20):
+    for t_, lab in ((0.3, "three"), (0.2, "two"), (0.1, "one")):
+        num(f"pwN{lab}S{['one', 'five', 'twenty'][[1, 5, 20].index(S_)]}", n_needed(si_med, ss_med, S_, t_), "{:d}")
+num("pwMdeEightFiveMed", mde(si_med, ss_med, 8, 5))
+num("pwMdeEightInfMed", mde(si_med, ss_med, 8, 10 ** 6))
+# with instance heterogeneity, more seeds cannot push the MDE below this floor for a fixed number of instances
+num("pwMdeThirtyTwoFiveMed", mde(si_med, ss_med, 32, 5))
+num("pwMdeThirtyTwoOneMed", mde(si_med, ss_med, 32, 1))
+num("pwMdeSixtyFourFiveMed", mde(si_med, ss_med, 64, 5))
+print("POWER:", {k: tuple(round(x, 3) for x in v) for k, v in vc.items()}, si_med, ss_med,
+      [n_needed(si_med, ss_med, S_, t_) for S_ in (1, 5, 20) for t_ in (0.3, 0.2, 0.1)])
+
+
+# ------------------------------------------- literature audit (data/literature_audit.csv)
+lit = pd.read_csv(os.path.join(ROOT, "data", "literature_audit.csv"), dtype=str)
+sym = {"Y": "$\\bullet$", "P": "$\\circ$", "N": "--"}
+eff = {"T": "time", "I": "iter.", "U": "--"}
+la_rows = []
+for r in lit.itertuples():
+    la_rows.append({"Study": f"\\citet{{{r.key}}}", "Problem": r.problem, "Effort": eff[r.effort],
+                    "Tuning": sym[r.baseline_tuning], "Config.": sym[r.config_sensitivity],
+                    "Runs": r.repeated_runs if r.repeated_runs != "N" else "--",
+                    "Test": sym[r.stat_test], "Mult.": sym[r.multiplicity], "OOD": sym[r.ood],
+                    "Ablation": sym[r.ablation]})
+la_rows.append({"Study": "This study", "Problem": "CVRP", "Effort": "iter., CPU", "Tuning": sym["Y"],
+                "Config.": sym["Y"], "Runs": "3--5", "Test": sym["Y"], "Mult.": sym["Y"], "OOD": sym["Y"],
+                "Ablation": sym["Y"]})
+tex_table(pd.DataFrame(la_rows), os.path.join(HERE, "tables", "audit.tex"), "llcccccccc")
+num("litN", len(lit), "{:d}")
+num("litTime", (lit.effort == "T").sum(), "{:d}")
+num("litIter", (lit.effort == "I").sum(), "{:d}")
+num("litUnmatched", (lit.effort == "U").sum(), "{:d}")
+num("litTuneY", (lit.baseline_tuning == "Y").sum(), "{:d}")
+num("litTuneN", (lit.baseline_tuning == "N").sum(), "{:d}")
+num("litConfY", (lit.config_sensitivity == "Y").sum(), "{:d}")
+num("litConfP", (lit.config_sensitivity == "P").sum(), "{:d}")
+num("litRuns", (lit.repeated_runs != "N").sum(), "{:d}")
+num("litTest", (lit.stat_test == "Y").sum(), "{:d}")
+num("litMult", (lit.multiplicity == "Y").sum(), "{:d}")
+num("litOodY", (lit.ood == "Y").sum(), "{:d}")
+num("litOodP", (lit.ood == "P").sum(), "{:d}")
+num("litAblY", (lit.ablation == "Y").sum(), "{:d}")
+num("litEffortRunsTest", ((lit.effort != "U") & (lit.repeated_runs != "N") & (lit.stat_test == "Y")).sum(), "{:d}")
+
+
+# ------------------------------------------- RQ2 strictly time-controlled comparison
+ftc = os.path.join(R, "bench_time_controlled.csv")
+tc_runs = 0
+if os.path.exists(ftc):
+    tcr = pd.read_csv(ftc)
+    assert tcr.feasible.all()
+    tcr = tcr[tcr.groupby(["cell", "instance", "budget_mult", "seed"]).method.transform("nunique") == 2]
+    tc_runs = len(tcr)
+    tc_rows = []
+    tc_p = []
+    cell_lab = {"ID_CD": ("Generated", CD), "ID_CT": ("Generated", CT), "X_CD": ("Uchoa X", CD), "X_CT": ("Uchoa X", CT)}
+    for mult in sorted(tcr.budget_mult.unique()):
+        effs = {}
+        for cell, (iset, conf) in cell_lab.items():
+            d_ = tcr[(tcr.budget_mult == mult) & (tcr.cell == cell)]
+            if d_.empty:
+                continue
+            pv = d_.pivot_table(index=["instance", "seed"], columns="method", values="cost")
+            effs[cell] = 100 * (pv["VAE-PALNS"] / pv["PALNS"] - 1)
+            it = d_.pivot_table(index=["instance", "seed"], columns="method", values="iterations")
+            r_ = inst_level(d_.replace({"method": {"VAE-PALNS": "G"}}), "G", "PALNS")
+            k_ = f"tc{cell.replace('_', '')}{'One' if mult == 1 else 'Four'}"
+            num(k_ + "D", effs[cell].mean(), "{:+.2f}")
+            num(k_ + "P", r_["p_pair"], "{:.3f}")
+            tc_p.append(r_["p_pair"])
+            num(k_ + "Pinst", r_["p_flip"], "{:.3f}")
+            num(k_ + "It", 100 * (it["VAE-PALNS"].mean() / it["PALNS"].mean() - 1), "{:+.1f}")
+        for iset, cD, cT in [("Generated", "ID_CD", "ID_CT"), ("Uchoa X", "X_CD", "X_CT")]:
+            if cD not in effs or cT not in effs:
+                continue
+            ri = interaction(effs[cD], effs[cT])
+            k_ = f"tc{'ID' if iset == 'Generated' else 'X'}{'One' if mult == 1 else 'Four'}Int"
+            num(k_, ri["mean"], "{:+.2f}"); num(k_ + "Lo", ri["lo"], "{:+.2f}"); num(k_ + "Hi", ri["hi"], "{:+.2f}")
+            num(k_ + "P", ri["p_flip"], "{:.3f}")
+            itD = tcr[(tcr.budget_mult == mult) & (tcr.cell == cD)]
+            tc_rows.append({"Budget": f"{mult:g}$\\times$", "Instances": iset,
+                            "Iter.\\ guided (\\%)": "",
+                            "$\\Delta$ $C_D$ (\\%)": f"{effs[cD].mean():+.2f}",
+                            "$\\Delta$ $C_T$ (\\%)": f"{effs[cT].mean():+.2f}",
+                            "$\\Delta_{\\mathrm{int}}$ (\\%)": f"{ri['mean']:+.2f}",
+                            "95\\% CI": f"[{ri['lo']:+.2f}, {ri['hi']:+.2f}]",
+                            "$p$ sign-flip": f"{ri['p_flip']:.3f}"})
+            # iteration share of the guided method relative to unguided PALNS under the same CPU limit
+            itc = []
+            for c in (cD, cT):
+                d_ = tcr[(tcr.budget_mult == mult) & (tcr.cell == c)]
+                itc.append(d_[d_.method == "VAE-PALNS"].iterations.mean() / d_[d_.method == "PALNS"].iterations.mean() - 1)
+            tc_rows[-1]["Iter.\\ guided (\\%)"] = f"{100 * itc[0]:+.1f} / {100 * itc[1]:+.1f}"
+    tex_table(pd.DataFrame(tc_rows), os.path.join(HERE, "tables", "timecontrol.tex"), "llrrrrrr")
+    num("tcRuns", tc_runs, "{:d}")
+    num("tcHolmMin", min(holm(tc_p)), "{:.2f}")
+    tc_eff = [100 * (g.set_index(["instance", "seed"]).query("method == 'VAE-PALNS'").cost
+                     / g.set_index(["instance", "seed"]).query("method == 'PALNS'").cost - 1).mean()
+              for _, g in tcr.groupby(["cell", "budget_mult"])]
+    num("tcDMin", min(tc_eff), "{:+.2f}"); num("tcDMax", max(tc_eff), "{:+.2f}")
+    tc_it = [100 * (1 - g[g.method == "VAE-PALNS"].iterations.mean() / g[g.method == "PALNS"].iterations.mean())
+             for _, g in tcr.groupby(["cell", "budget_mult"])]
+    num("tcFewerMin", min(tc_it), "{:.1f}"); num("tcFewerMax", max(tc_it), "{:.1f}")   # guided effect, 8 cells (4 cells x 2 budgets)
+    num("tcCpuOne", tcr[tcr.budget_mult == 1].budget_cpu.mean(), "{:.1f}")
+    num("tcItMin", 100 * min(
+        (g[g.method == "VAE-PALNS"].iterations.mean() / g[g.method == "PALNS"].iterations.mean() - 1)
+        for _, g in tcr.groupby(["cell", "budget_mult"])), "{:+.1f}")
+    num("tcItMax", 100 * max(
+        (g[g.method == "VAE-PALNS"].iterations.mean() / g[g.method == "PALNS"].iterations.mean() - 1)
+        for _, g in tcr.groupby(["cell", "budget_mult"])), "{:+.1f}")
+    num("tcCpuDev", 100 * (tcr.cpu_s / tcr.budget_cpu - 1).abs().max(), "{:.1f}")
+
+tot = tc_runs + len(main) + len(shift_T) + sum(len(s) for s in strength_parts) \
     + len(shift[shift.tag != "ID"]) + len(shift[(shift.tag == "ID") & (shift.method == "RACE:uniform")]) \
     + len(tc) + len(road) + len(eq) + len(rer) \
     + len(pd.read_csv(os.path.join(R, "bench_ablation_p3.csv"))) \

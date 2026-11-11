@@ -17,7 +17,7 @@ verified by finite differences. Every solution reported is independently re-chec
 | `tests/` | 13 correctness tests (feasibility of every operator pair, known optimal cost, VAE gradient check, conformal guarantee, explicit road matrices, …) |
 | `data/` | benchmark instances, reference costs, OSM road extracts and the 42 road instances (see `data/LICENSES.md`) |
 | `models/` | the trained VAEs (`vae_uniform.npz`, `vae_mixed.npz`) and calibrated gates |
-| `results/` | raw CSV logs of all 2,368 runs reported in the paper, plus summaries |
+| `results/` | raw CSV logs of all 2,512 runs reported in the paper, plus summaries |
 | `paper/` | `make_assets.py` regenerates every number, table and figure of the paper from `results/`; `verify_numbers.py` re-computes them independently |
 
 ## Install
@@ -29,7 +29,7 @@ python3 -m pytest -q tests
 
 ## Reproduce
 
-All experiments use equal budgets of 4,000 destroy–repair iterations (4 workers × 10 epochs × 100).
+All experiments use equal budgets of 4,000 destroy–repair iterations (4 workers × 10 epochs × 100), except the stronger-search check, which also uses 16,000 iterations (4 × 10 × 400).
 Scripts resume where they stopped. Times are on 2 CPU cores.
 
 | Step | Command | Output |
@@ -45,6 +45,8 @@ Scripts resume where they stopped. Times are on 2 CPU cores.
 | RQ4 road study (~2 h) | `bash scripts/run_road_study.sh` | `results/bench_road.csv` |
 | RQ2 approximately-equal-CPU sensitivity (~1 h) | `python3 scripts/run_equal_cpu.py` | `results/bench_equal_cpu.csv` |
 | RQ2 same-budget baseline re-run, independent seeds (~1 h) | `python3 scripts/run_equal_cpu.py --rerun --out results/bench_baseline_rerun.csv` | `results/bench_baseline_rerun.csv` |
+| RQ2 identical CPU-time limits, 1× and 4× budget (~5 h) | `python3 scripts/run_time_controlled.py` | `results/bench_time_controlled.csv` |
+| RQ1 stronger-search check: 16,000 iterations and X instances with 303–502 customers (~3.5 h) | `bash scripts/run_strength_check.sh` | `results/bench_strength.csv`, `results/bench_strength_large16k.csv` |
 | Reconstruction error vs improvement | `python3 scripts/recon_vs_gain.py` | `results/recon_vs_gain/` |
 | Paper numbers, tables and figures | `cd paper && python3 make_assets.py && python3 verify_numbers.py` | `paper/numbers.tex`, `tables/`, `figures/` |
 
@@ -60,7 +62,11 @@ python3 scripts/run_benchmarks.py --instances data/cvrplib/X-n101-k25.vrp \
 |---|---|
 | RQ1: synchronization | Independent multi-start is +0.68% worse than synchronized PALNS at equal iterations (p < 0.001); synchronized PALNS does not significantly outperform sequential ALNS at equal iterations; wall-clock speed-up not evaluated |
 | RQ1: guidance on X | −0.15% (not significant) |
-| RQ2: configuration dependence | At equal iterations on generated instances: −0.23% (C_D) vs +0.25% (C_T); interaction +0.48 points, 95% CI [+0.17, +0.83], sign-flip p = 0.016 (an A/A comparison of the baseline gives a pseudo-interaction of +0.21, p = 0.34). At approximately equal CPU the evidence is insufficient: +0.14 [−0.10, +0.47], p = 0.51. Two independent sets of unguided runs at the same budget differ by −0.17% to +0.17%, the same order as the guidance effects |
+| RQ1: stronger base search | Mean PALNS gap to the best-known solution falls from 1.34% (4,000 iterations) to 0.51% (16,000) on X-n101–201, and is 1.22% at 16,000 iterations on X-n303–502. The guidance effect stays within ±0.15 points (−0.15, +0.05, −0.03, +0.03); none significant |
+| Unit of analysis | With the instance as the unit (exact sign-flip test over per-instance means, `paper/tables/unit.tex`), 2 of 21 principal comparisons change at the 5% level: the in-distribution benefit under C_D (p = 0.043 over runs → 0.164 over instances) and the benefit on X under C_T (0.018 → 0.062). Synchronization (+0.68%) and the harm of guidance under C_T (+0.25%) stay significant (p = 0.023) |
+| RQ2: configuration dependence | At equal iterations on generated instances: −0.23% (C_D) vs +0.25% (C_T); interaction +0.48 points, 95% CI [+0.17, +0.83], sign-flip p = 0.016 (an A/A comparison of the baseline gives a pseudo-interaction of +0.21, p = 0.34). At approximately equal CPU the evidence is insufficient: +0.14 [−0.10, +0.47], p = 0.51. Under identical CPU-time limits (both methods stop at the same per-worker CPU budget, VAE overhead included; guided completes 3.8–8.8% fewer iterations) the interaction is −0.09 [−0.37, +0.21] (p = 0.61) at the base budget and −0.05 [−0.30, +0.19] (p = 0.77) at 4×; guidance effects lie in −0.11% to +0.14% in all eight cells (none significant after Holm). Two independent sets of unguided runs at the same budget differ by −0.17% to +0.17%, the same order as the guidance effects |
+| Power | Paired-difference noise across seeds σ_seed ≈ 0.66% dominates instance heterogeneity σ_inst ≈ 0.09%. With 8 instances the MDE (α = 0.05, power 0.8) is ≈ 0.4% with the instance as the unit; detecting 0.2% with 5 seeds needs 21 instances, 0.1% needs 78 (`paper/tables/power.tex`) |
+| Literature audit | 20 learned-LNS/ALNS studies coded for evaluation controls (`data/literature_audit.csv`): none varied the base-search configuration or corrected for multiple comparisons; 4 used a statistical test |
 | Guidance signal | VAE reconstruction error does not predict the gain of 10-customer removal-and-repair moves (Spearman ρ −0.08 to +0.01); only ~1% of such moves improve late-stage solutions |
 | RQ3: distribution shift | No policy difference survives Holm correction. The in-distribution benefit (C_D) vanishes under layout, route-length and size shift and persists under depot shift; the Mondrian gate flags 0% ID, 38% clustered, 62% long-route instances; retrospective per-instance selection between the two methods would gain −0.14% |
 | RQ4: real roads | −0.04% (uniform VAE), −0.01% (mixed VAE), not significant, unrelated to sprawl descriptors |

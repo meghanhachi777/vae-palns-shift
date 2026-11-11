@@ -1,0 +1,27 @@
+\begin{tabular}{lllrrrrrr}
+\toprule
+RQ & Instances & Comparison & Inst. & Runs & $\Delta$ (\%) & $p_{\mathrm{runs}}$ & $p_{\mathrm{flip}}$ & $p_{\mathrm{W}}$ \\
+\midrule
+RQ1 & Uchoa X, $C_D$ & ALNS & 8 & 40 & +0.01 & 0.738 & 0.883 & 0.945 \\
+RQ1 & Uchoa X, $C_D$ & PALNS-indep & 8 & 40 & +0.68 & <0.001 & 0.023 & 0.023 \\
+RQ1 & Uchoa X, $C_D$ & Guided & 8 & 40 & -0.15 & 0.432 & 0.109 & 0.148 \\
+RQ2 & Generated, $C_D$ & Guided & 8 & 32 & -0.23 & 0.043 & 0.164 & 0.250 \\
+RQ2 & Generated, $C_T$ & Guided & 8 & 32 & +0.25 & 0.020 & 0.023 & 0.023 \\
+RQ2 & Uchoa X, $C_T$ & Guided & 8 & 40 & -0.27 & 0.018 & 0.062 & 0.055 \\
+RQ2 CPU & Generated, $C_D$ & Guided (vs PALNS$^{+}$) & 8 & 32 & -0.13 & 0.373 & 0.383 & 0.547 \\
+RQ2 CPU & Generated, $C_T$ & Guided (vs PALNS$^{+}$) & 8 & 32 & +0.01 & 0.869 & 0.844 & 1.000 \\
+RQ2 CPU & Uchoa X, $C_D$ & Guided (vs PALNS$^{+}$) & 8 & 40 & -0.07 & 0.984 & 0.781 & 1.000 \\
+RQ2 CPU & Uchoa X, $C_T$ & Guided (vs PALNS$^{+}$) & 8 & 40 & -0.04 & 0.898 & 0.781 & 0.945 \\
+RQ3 & RC, $C_D$ & Guided & 8 & 32 & +0.07 & 0.557 & 0.523 & 0.641 \\
+RQ3 & C, $C_D$ & Guided & 8 & 32 & -0.01 & 0.633 & 0.922 & 0.945 \\
+RQ3 & E-depot, $C_D$ & Guided & 8 & 32 & -0.15 & 0.483 & 0.289 & 0.312 \\
+RQ3 & long-routes, $C_D$ & Guided & 8 & 32 & -0.02 & 0.776 & 0.773 & 0.641 \\
+RQ3 & n200, $C_D$ & Guided & 8 & 32 & +0.01 & 0.888 & 0.945 & 0.844 \\
+RQ4 & Road, $C_D$ & Guided (uniform) & 42 & 126 & -0.04 & 0.506 & 0.422 & 0.406 \\
+RQ4 & Road, $C_D$ & Guided (mixed) & 42 & 126 & -0.01 & 0.544 & 0.875 & 0.647 \\
+RQ4 & Road, $C_D$ & Race & 42 & 126 & +0.04 & 0.365 & 0.473 & 0.365 \\
+Strength & X 101--201, 16{,}000 & Guided & 8 & 40 & +0.05 & 0.343 & 0.570 & 0.641 \\
+Strength & X 303--502, 4{,}000 & Guided & 4 & 20 & -0.03 & 0.898 & 0.875 & 0.875 \\
+Strength & X 303--502, 16{,}000 & Guided & 4 & 12 & +0.03 & 0.733 & 0.750 & 0.875 \\
+\bottomrule
+\end{tabular}

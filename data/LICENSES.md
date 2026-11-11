@@ -17,3 +17,7 @@ The code in this repository is MIT-licensed (see `LICENSE`). The data have their
 Obtain official district boundaries from the Instituto Geográfico Nacional (IGN) / INEI of Peru, or from
 the copy in https://github.com/Hardnyx/limarutas (`data/raw/ign/lima_callao_distritos.geojson`; no licence
 stated there, so check terms before redistributing).
+
+## Larger CVRPLIB X instances (`data/cvrplib_large/`)
+
+X-n303-k21, X-n344-k43, X-n401-k29 and X-n502-k39 (Uchoa et al., 2017) with their best-known solutions, taken from the PyVRP instance collection (https://github.com/PyVRP/Instances, MIT licence; see `PyVRP-Instances_LICENSE.txt`).

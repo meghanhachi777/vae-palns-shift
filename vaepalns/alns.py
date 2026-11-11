@@ -77,11 +77,18 @@ def run_alns(inst: Instance, start: Solution, destroy_ops: dict, repair_ops: dic
              d_weights: dict | None = None, r_weights: dict | None = None,
              it_offset: int = 0, total_iterations: int | None = None,
              t0: float | None = None, best: Solution | None = None,
-             history_every: int = 50) -> RunResult:
+             history_every: int = 50, cpu_budget: float | None = None,
+             cpu_t0: float | None = None, cpu_offset: float = 0.0,
+             cpu_total: float | None = None) -> RunResult:
     """Run ``iterations`` ALNS iterations starting from ``start``.
 
     ``it_offset``/``total_iterations``/``t0`` let PALNS run the global
     schedule in epochs. Returns best, final current solution and weights.
+
+    Time-controlled mode (``cpu_budget`` set): iterate until this process has
+    used ``cpu_budget`` CPU seconds since ``cpu_t0`` (default: the call), with
+    ``iterations`` as a safety cap. The annealing schedule then follows CPU
+    time: the fraction elapsed is ``(cpu_offset + used) / cpu_total``.
     """
     p = params or ALNSParams()
     total = total_iterations or iterations
@@ -107,11 +114,20 @@ def run_alns(inst: Instance, start: Solution, destroy_ops: dict, repair_ops: dic
     qmax = max(qmin, min(p.q_max_abs, int(p.q_max_frac * n)))
     qmin, qmax = min(qmin, n), min(qmax, n)
     t_start = time.perf_counter()
-    c_start = time.process_time()
+    c_start = time.process_time() if cpu_t0 is None else cpu_t0
+    done_iters = 0
 
     for local in range(iterations):
         it = it_offset + local
-        T = temperature(t0, it, total, p)
+        if cpu_budget is not None:
+            used = time.process_time() - c_start
+            if used >= cpu_budget:
+                break
+            frac = min(1.0, (cpu_offset + used) / cpu_total)
+            T = t0 * (p.t_end_ratio ** frac)
+        else:
+            T = temperature(t0, it, total, p)
+        done_iters += 1
         dname, rname = _roulette(dn, dw, rng), _roulette(rn, rw, rng)
         q = int(rng.integers(qmin, qmax + 1))
 
@@ -156,9 +172,9 @@ def run_alns(inst: Instance, start: Solution, destroy_ops: dict, repair_ops: dic
         if (local + 1) % history_every == 0:
             hist.append((it + 1, best.cost))
 
-    hist.append((it_offset + iterations, best.cost))
+    hist.append((it_offset + done_iters, best.cost))
     return RunResult(best=best, current=cur, d_weights=dw, r_weights=rw, history=hist,
                      d_stats={k: vars(v) for k, v in d_stats.items()},
                      r_stats={k: vars(v) for k, v in r_stats.items()},
-                     iterations=iterations, seconds=time.perf_counter() - t_start,
+                     iterations=done_iters, seconds=time.perf_counter() - t_start,
                      cpu_seconds=time.process_time() - c_start)
